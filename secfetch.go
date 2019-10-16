@@ -45,15 +45,21 @@ func allowed(r *http.Request) bool {
 	site := r.Header.Get("sec-fetch-site")
 	mode := r.Header.Get("sec-fetch-mode")
 
-	if site == "" || // Browser did not send Sec-Fetch-Site, bail out.
-		site == "none" || // The action was started by the user agent, not by a site.
-		site == "same-site" ||
-		site == "same-origin" {
+	// This allows same-site requests.
+	// To harden this protection uncomment the second condition.
+	if site != "cross-site" /*&& site != "same-site"*/ {
 		return true
 	}
 
-	// Here site is "cross-site", so let's just allow "GET" navigations
-	if mode == "navigate" && r.Method == "GET" {
+	// https://github.com/w3c/webappsec-fetch-metadata/issues/35
+	// https://bugs.chromium.org/p/chromium/issues/detail?id=979946
+	if mode == "" && r.Method == http.MethodOptions {
+		return true
+	}
+
+	// Here site is "cross-site", so let's just allow non-state-changing navigations
+	if (mode == "navigate" || mode == "nested-navigate") &&
+		(r.Method == http.MethodGet || r.Method == http.MethodHead) {
 		return true
 	}
 
